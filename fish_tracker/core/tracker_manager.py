@@ -3,7 +3,6 @@ import json
 import numpy as np
 import os
 import subprocess
-from pathlib import Path
 
 from fish_tracker.utils.logger import get_logger
 from fish_tracker.core.tracker_matcher import TrackerMatcher
@@ -19,8 +18,8 @@ class TrackerManager(TrackerMatcher):
         output_video_name,
         output_json_name,
         tracker_class=None,
-        log_level='INFO',
-        **kwargs
+        log_level="INFO",
+        **kwargs,
     ):
 
         super().__init__(log_level=log_level, **kwargs)
@@ -31,11 +30,11 @@ class TrackerManager(TrackerMatcher):
         self.max_absences = max_absences
         self.min_tracking_duration = min_tracking_duration
 
-        self.input_dir = '/app/data/input'
-        self.output_dir = '/app/data/outputs'
-        self.input_video_path = f'/app/data/inputs/{input_video_name}'
-        self.output_video_path =f'/app/data/outputs/{output_video_name}'
-        self.output_json_path = f'/app/data/outputs/{output_json_name}'
+        self.input_dir = "/app/data/input"
+        self.output_dir = "/app/data/outputs"
+        self.input_video_path = f"/app/data/inputs/{input_video_name}"
+        self.output_video_path = f"/app/data/outputs/{output_video_name}"
+        self.output_json_path = f"/app/data/outputs/{output_json_name}"
 
         self.trackers = []
         self.finished = []
@@ -44,6 +43,7 @@ class TrackerManager(TrackerMatcher):
 
         if tracker_class is None:
             from fish_tracker.trackers.kalman_tracker import KalmanObjectTracker
+
             self.tracker_class = KalmanObjectTracker
         else:
             self.tracker_class = tracker_class
@@ -59,15 +59,17 @@ class TrackerManager(TrackerMatcher):
 
         return matched_trackers
 
-    def handle_unmatched_trackers(self, unmatched_trackers_indices, frame_num, curr_time):
+    def handle_unmatched_trackers(
+        self, unmatched_trackers_indices, frame_num, curr_time
+    ):
         unmatched_trackers = []
         for r in unmatched_trackers_indices:
             tracker = self.trackers[r]
-            self.logger.debug(f'unmatched_tracker {tracker._id}')
-            if tracker.absences  > self.max_absences:
+            self.logger.debug(f"unmatched_tracker {tracker._id}")
+            if tracker.absences > self.max_absences:
                 tracker.terminate(frame_num, curr_time)
                 self.logger.debug("terminated")
-                if  tracker.duration > self.min_tracking_duration:
+                if tracker.duration > self.min_tracking_duration:
                     self.finished.append(tracker)
                 else:
                     self.logger.debug("trashed")
@@ -106,14 +108,22 @@ class TrackerManager(TrackerMatcher):
             self.make_associations(self.trackers, detected_boxes)
         )
         associations = self.merge_multiple_associations(associations, self.trackers)
-        self.logger.debug(f'associations: {[(_item[0], _item[1]._id) for _item in associations.items()]}')
-        self.logger.debug(f'unmatched_detections: {unmatched_detections}')
+
+        self.logger.debug(
+            "associations: %s",
+            [(_item[0], _item[1]._id) for _item in associations.items()],
+        )
+        self.logger.debug(f"unmatched_detections: {unmatched_detections}")
 
         # Handle assigned trackers.
-        matched_trackers = self.handle_matched_trackers(associations, detected_boxes, frame_num)
-    
+        matched_trackers = self.handle_matched_trackers(
+            associations, detected_boxes, frame_num
+        )
+
         # Handle unassigned trackers.
-        unmatched_trackers = self.handle_unmatched_trackers(unmatched_trackers_indices, frame_num, curr_time)
+        unmatched_trackers = self.handle_unmatched_trackers(
+            unmatched_trackers_indices, frame_num, curr_time
+        )
 
         # Initialize new trackers.
         new_trackers = self.initialize_new_trackers(
@@ -129,7 +139,7 @@ class TrackerManager(TrackerMatcher):
     def terminate(self, frame_num, curr_time):
 
         for _tracker in self.trackers:
-            self.logger.debug(f'Terminated tracker {_tracker._id}')
+            self.logger.debug(f"Terminated tracker {_tracker._id}")
             _tracker.terminate(frame_num, curr_time)
             if _tracker.duration > self.min_tracking_duration:
                 self.finished.append(_tracker)
@@ -225,26 +235,25 @@ class TrackerManager(TrackerMatcher):
 
         cap.release()
 
-        self.concat_png_to_video(folder=self.output_dir,
-                                 output_video_path=self.output_video_path,
-                                 logger=self.logger)
+        self.concat_png_to_video(
+            folder=self.output_dir,
+            output_video_path=self.output_video_path,
+            logger=self.logger,
+        )
 
     @staticmethod
-    def concat_png_to_video(folder,
-                            output_video_path,
-                            logger,
-                            fps=30):
+    def concat_png_to_video(folder, output_video_path, logger, fps=30):
 
         cmd = [
             "ffmpeg",
-            "-y", # force overwriting
+            "-y",  # force overwriting
             "-i",
             os.path.join(folder, "out_frame%4d.png"),
             "-c:v",
             "libx264",
             "-pix_fmt",
             "yuv420p",
-            output_video_path
+            output_video_path,
         ]
         print(cmd)
 

@@ -10,7 +10,9 @@ class KalmanObjectTracker(BaseTracker):
     A tracker using a Kalman filter to estimate object position over time.
     """
 
-    def __init__(self, start_frame: int, start_time: float, x0: float, y0: float) -> None:
+    def __init__(
+        self, start_frame: int, start_time: float, x0: float, y0: float
+    ) -> None:
         super().__init__(start_frame, start_time, x0, y0)
         self._build_Kalman_filter()
 
@@ -42,13 +44,16 @@ class KalmanObjectTracker(BaseTracker):
     def predict(self):
         prediction = self.kf.predict()
         self.x, self.y = int(prediction[0].item()), int(prediction[1].item())
-        
-    def correct_prediction(self, bbox: tuple[int, int, int, int] | None, frame_num: int) -> None:
+
+    def correct_prediction(
+        self, bbox: tuple[int, int, int, int] | None, frame_num: int
+    ) -> None:
         """
         Correct the predicted position using a new detection.
 
         Args:
-            bbox (tuple): Detected bounding box as (x, y, w, h). If None, no correction is applied.
+            bbox (tuple): Detected bounding box as (x, y, w, h).
+                          If None, no correction is applied.
             frame_num (int): Frame number of the current detection.
         """
         if bbox is None:
