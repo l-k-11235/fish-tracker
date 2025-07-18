@@ -10,7 +10,6 @@ from fish_tracker.detection.object_detector import ObjectDetector
 from fish_tracker.core.tracker_manager import TrackerManager
 
 
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -26,14 +25,14 @@ def parse_args():
         type=str,
         required=False,
         default=None,
-        help="Path to the first_frame",
+        help="Path to the first_frame (png file)",
     )
     parser.add_argument(
         "--output_video_name",
         "-vo",
         type=str,
         required=False,
-        default='output.mp4',
+        default="output.mp4",
         help="Output video file name",
     )
     parser.add_argument(
@@ -42,7 +41,7 @@ def parse_args():
         type=str,
         default="output.json",
         required=False,
-        help="JSON output name"
+        help="JSON output name",
     )
     parser.add_argument(
         "--min_area",
@@ -76,7 +75,7 @@ def parse_args():
         type=float,
         default=0.5,
         required=False,
-        help="Minimum duration to preserve a tracking trajectory"
+        help="Minimum duration to preserve a tracking trajectory",
     )
     parser.add_argument(
         "--step",
@@ -106,7 +105,7 @@ def parse_args():
         "--log_level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Log level."
+        help="Log level.",
     )
     args = parser.parse_args()
     return args
@@ -124,7 +123,7 @@ def fish_tracking(
     step=1,
     start=0,
     end=None,
-    log_level='INFO',
+    log_level="INFO",
 ):
 
     log_level = getattr(logging, args.log_level.upper(), logging.INFO)
@@ -137,8 +136,8 @@ def fish_tracking(
     logger.info("Start tracking")
 
     random.seed(42)
-    video_path = f'/app/data/inputs/{input_video_name}'
- 
+    video_path = f"/app/data/inputs/{input_video_name}"
+
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
@@ -151,7 +150,6 @@ def fish_tracking(
         if end is None:
             end = nb_frames
 
-
         if first_frame is None:
             _, first_frame = cap.read()
         else:
@@ -160,9 +158,9 @@ def fish_tracking(
         # ################### #
         # Initialize Detector #
         # ################### #
-        detector = ObjectDetector(reference_frame=first_frame,
-                                  min_contour_area=min_area,
-                                  log_level=log_level)
+        detector = ObjectDetector(
+            reference_frame=first_frame, min_contour_area=min_area, log_level=log_level
+        )
 
         # ########################## #
         # Initialize Tracker Manager #
@@ -174,7 +172,7 @@ def fish_tracking(
             input_video_name=input_video_name,
             output_video_name=output_video_name,
             output_json_name=output_json_name,
-            log_level=log_level
+            log_level=log_level,
         )
 
         # ########## #
@@ -198,7 +196,10 @@ def fish_tracking(
             # ######## #
             # Tracking #
             # ######## #
-            logger.debug(f"Running trackers: {[(_t._id, _t.absences) for _t in manager.trackers]}")
+            logger.debug(
+                "Running trackers: %s",
+                [(_t._id, _t.absences) for _t in manager.trackers],
+            )
 
             manager.process(frame_num, frame, curr_time, detected_boxes)
 
@@ -217,7 +218,6 @@ def fish_tracking(
 
 
 if __name__ == "__main__":
-    print('##########################')
     args = parse_args()
     fish_tracking(
         input_video_name=args.input_video_name,
@@ -231,5 +231,5 @@ if __name__ == "__main__":
         step=args.step,
         start=args.start,
         end=args.end,
-        log_level=args.log_level
+        log_level=args.log_level,
     )

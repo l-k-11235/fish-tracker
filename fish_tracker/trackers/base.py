@@ -8,11 +8,9 @@ from abc import ABC, abstractmethod
 class BaseTracker(ABC):
     """Abstract base class for all object trackers."""
 
-    def __init__(self,
-                 start_frame: int,
-                 start_time: float,
-                 x0: float,
-                 y0: float) -> None:
+    def __init__(
+        self, start_frame: int, start_time: float, x0: float, y0: float
+    ) -> None:
         """
         Initialize a tracker.
         Args:

@@ -2,6 +2,7 @@ import cv2
 
 from fish_tracker.utils.logger import get_logger
 
+
 class BackgroundSubtractor:
 
     def __init__(
@@ -12,7 +13,7 @@ class BackgroundSubtractor:
         kernel_size=5,  # for morphological transformations
         dilatation_iter=5,
         morphological_gradient_iter=1,
-        log_level='INFO'
+        log_level="INFO",
     ):
 
         self.gaussian_blur_size = gaussian_blur_size

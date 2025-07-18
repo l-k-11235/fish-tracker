@@ -1,18 +1,18 @@
 import cv2
 
 from fish_tracker.utils.background import BackgroundSubtractor
-from fish_tracker.utils.logger import get_logger, set_global_log_level
+from fish_tracker.utils.logger import get_logger
 
 
 class ObjectDetector(BackgroundSubtractor):
 
-    def __init__(self, min_contour_area=2000, log_level='INFO', **kwargs):
+    def __init__(self, min_contour_area=2000, log_level="INFO", **kwargs):
 
         super().__init__(**kwargs)
 
         self.logger = get_logger("ObjectDetector")
         self.logger.info("Detector initialization")
-        
+
         self.min_contour_area = min_contour_area
         self.contours = []
         self.contour_areas = []

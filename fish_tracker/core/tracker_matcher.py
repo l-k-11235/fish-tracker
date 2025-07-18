@@ -6,13 +6,11 @@ from fish_tracker.utils.logger import get_logger
 
 class TrackerMatcher:
 
-    def __init__(self,
-                 distance_threshold,
-                 **kwargs):
+    def __init__(self, distance_threshold, **kwargs):
 
         self.logger = get_logger("TrackerMatcher")
         self.logger.info("TrackerMatcher Initialization")
-    
+
         self.distance_threshold = distance_threshold
 
     @staticmethod
@@ -44,7 +42,9 @@ class TrackerMatcher:
         }
         self.logger.debug("Global optimal assignment")
         for i, j in zip(row_ind, col_ind):
-            self.logger.debug(f'{i}, {j}, {cost_matrix[i, j]} {self.distance_threshold}')
+            self.logger.debug(
+                "%d, %d, %f %f", i, j, cost_matrix[i, j], self.distance_threshold
+            )
 
         assigned_boxes = set(base_associations.keys())
         assigned_trackers = set().union(*base_associations.values())
@@ -56,7 +56,7 @@ class TrackerMatcher:
                 if i in assigned_trackers:
                     continue
                 dist = _tracker.distance_to_box(_box)
-                self.logger.debug(f'{i}, {j}, {dist} {self.distance_threshold}')
+                self.logger.debug(f"{i}, {j}, {dist} {self.distance_threshold}")
 
                 if dist < self.distance_threshold:
                     if j not in base_associations:
