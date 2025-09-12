@@ -12,6 +12,7 @@ class TrackerManager(TrackerMatcher):
 
     def __init__(
         self,
+        motion_boxes,
         max_absences,
         min_tracking_duration,
         input_video_name,
@@ -27,6 +28,7 @@ class TrackerManager(TrackerMatcher):
         self.logger = get_logger("TrackerManager")
         self.logger.info("TrackerManager Initialization")
 
+        self.motion_boxes = motion_boxes
         self.max_absences = max_absences
         self.min_tracking_duration = min_tracking_duration
 
@@ -39,7 +41,6 @@ class TrackerManager(TrackerMatcher):
         self.trackers = []
         self.finished = []
         self.trashed = []
-        self.contours = {}
 
         if tracker_class is None:
             from fish_tracker.trackers.kalman_tracker import KalmanObjectTracker
@@ -94,7 +95,7 @@ class TrackerManager(TrackerMatcher):
 
         return new_trackers
 
-    def process(self, frame_num, frame, curr_time, detected_boxes):
+    def process(self, frame_num, curr_time, detected_boxes):
 
         self.frame_num = frame_num
         self.curr_time = curr_time
@@ -165,7 +166,7 @@ class TrackerManager(TrackerMatcher):
             "nb_detected": len(self.finished),
             "nb_trashed": len(self.trashed),
             "current_time": time,
-            "contours": self.contours,
+            "motion_boxes": self.motion_boxes,
         }
 
         if self.finished:
@@ -186,76 +187,88 @@ class TrackerManager(TrackerMatcher):
         with open(self.output_json_path, "r") as f:
             res = json.load(f)
 
-        cap = cv2.VideoCapture(self.input_video_path)
-        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
         current_trajectories = {_tracker["_id"]: [] for _tracker in res["Detection"]}
 
-        for frame_num in range(start, end, step):
-            _, frame = cap.read()
+        cap = cv2.VideoCapture(self.input_video_path)
+        frame_num = start
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
 
-            # Reconstruct contours
-            serialized_contours = res["contours"][str(frame_num)]
-            if serialized_contours:
-                contours = [
-                    np.array(_c, dtype=np.int32).reshape((-1, 1, 2))
-                    for _c in serialized_contours
-                ]
-                cv2.drawContours(frame, contours, -1, (255, 0, 0), 4)
+        while frame_num < end:
 
-            # Draw trajectories for “validated” trackers
-            for _tracker in res["Detection"]:
-                if _tracker["trajectory"].get(str(frame_num), None) is not None:
-                    current_trajectories[_tracker["_id"]].append(
-                        _tracker["trajectory"][str(frame_num)]
-                    )
-                if frame_num <= _tracker["end_frame"]:
-                    trajectory = current_trajectories[_tracker["_id"]]
-                    if trajectory:
-                        pts = np.array(trajectory, dtype=np.int32)
-                        pts = pts.reshape((-1, 1, 2))
-                        cv2.polylines(
-                            frame,
-                            [pts],
-                            isClosed=False,
-                            color=_tracker["color"],
-                            thickness=5,
+            success, frame = cap.read()
+            if not success:
+                break
+
+            if frame_num == start:
+                pass
+
+            elif frame_num % step == 0:
+
+                motion_boxes = res["motion_boxes"][str(frame_num)]
+
+                for x, y, w, h in motion_boxes:
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+                # Draw trajectories for “validated” trackers
+                for _tracker in res["Detection"]:
+                    if _tracker["trajectory"].get(str(frame_num), None) is not None:
+                        current_trajectories[_tracker["_id"]].append(
+                            _tracker["trajectory"][str(frame_num)]
                         )
-                        cv2.putText(
-                            frame,
-                            str(_tracker["_id"]),
-                            trajectory[-1],
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5,
-                            _tracker["color"],
-                            2,
-                        )
+                    if frame_num <= _tracker["end_frame"]:
+                        trajectory = current_trajectories[_tracker["_id"]]
+                        if trajectory:
+                            pts = np.array(trajectory, dtype=np.int32)
+                            pts = pts.reshape((-1, 1, 2))
+                            cv2.polylines(
+                                frame,
+                                [pts],
+                                isClosed=False,
+                                color=_tracker["color"],
+                                thickness=5,
+                            )
+                            cv2.putText(
+                                frame,
+                                str(_tracker["_id"]),
+                                trajectory[-1],
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.5,
+                                _tracker["color"],
+                                2,
+                            )
 
             img_path = os.path.join(self.output_dir, f"out_frame{frame_num:04d}.png")
             cv2.imwrite(img_path, frame)
+            frame_num += 1
 
         cap.release()
 
         self.concat_png_to_video(
             folder=self.output_dir,
             output_video_path=self.output_video_path,
+            step=step,
             logger=self.logger,
         )
 
     @staticmethod
-    def concat_png_to_video(folder, output_video_path, logger, fps=30):
+    def concat_png_to_video(folder, output_video_path, step, logger, fps=30):
 
         cmd = [
             "ffmpeg",
-            "-y",  # force overwriting
+            "-y",
+            "-framerate",
+            str(fps),
+            "-pattern_type",
+            "glob",
             "-i",
-            os.path.join(folder, "out_frame%4d.png"),
+            os.path.join(folder, "out_frame*.png"),
             "-c:v",
             "libx264",
             "-pix_fmt",
             "yuv420p",
             output_video_path,
         ]
-        print(cmd)
+        logger.debug(" ".join(cmd))
 
         subprocess.run(cmd)
 
