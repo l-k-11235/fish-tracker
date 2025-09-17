@@ -1,8 +1,4 @@
-import cv2
 import json
-import numpy as np
-import os
-import subprocess
 
 from fish_tracker.utils.logger import get_logger
 from fish_tracker.core.tracker_matcher import TrackerMatcher
@@ -15,8 +11,8 @@ class TrackerManager(TrackerMatcher):
         motion_boxes,
         max_absences,
         min_tracking_duration,
+        fps,
         input_video_name,
-        output_video_name,
         output_json_name,
         tracker_class=None,
         log_level="INFO",
@@ -31,11 +27,12 @@ class TrackerManager(TrackerMatcher):
         self.motion_boxes = motion_boxes
         self.max_absences = max_absences
         self.min_tracking_duration = min_tracking_duration
+        self.fps = fps
 
         self.input_dir = "/app/data/input"
         self.output_dir = "/app/data/outputs"
         self.input_video_path = f"/app/data/inputs/{input_video_name}"
-        self.output_video_path = f"/app/data/outputs/{output_video_name}"
+        # self.output_video_path = f"/app/data/outputs/{output_video_name}"
         self.output_json_path = f"/app/data/outputs/{output_json_name}"
 
         self.trackers = []
@@ -67,6 +64,7 @@ class TrackerManager(TrackerMatcher):
         for r in unmatched_trackers_indices:
             tracker = self.trackers[r]
             self.logger.debug(f"unmatched_tracker {tracker._id}")
+            tracker.absences += 1
             if tracker.absences > self.max_absences:
                 tracker.terminate(frame_num, curr_time)
                 self.logger.debug("terminated")
@@ -76,7 +74,6 @@ class TrackerManager(TrackerMatcher):
                     self.logger.debug("trashed")
                     self.trashed.append(tracker)
             else:
-                tracker.absences += 1
                 unmatched_trackers.append(tracker)
         return unmatched_trackers
 
@@ -104,35 +101,41 @@ class TrackerManager(TrackerMatcher):
         for _tracker in self.trackers:
             _tracker.predict()
 
-        # Map boxes with trackers.
-        (associations, unmatched_trackers_indices, unmatched_detections) = (
-            self.make_associations(self.trackers, detected_boxes)
-        )
-        associations = self.merge_multiple_associations(associations, self.trackers)
+        if detected_boxes:
+            self.logger.debug(
+                "Running trackers: %s",
+                [(_t._id, _t.absences) for _t in self.trackers],
+            )
+            self.logger.debug(f"{len(detected_boxes)} detected_boxes")
+            # Map boxes with trackers.
+            (associations, unmatched_trackers_indices, unmatched_detections) = (
+                self.make_associations(self.trackers, detected_boxes)
+            )
+            associations = self.merge_multiple_associations(associations, self.trackers)
 
-        self.logger.debug(
-            "associations: %s",
-            [(_item[0], _item[1]._id) for _item in associations.items()],
-        )
-        self.logger.debug(f"unmatched_detections: {unmatched_detections}")
+            self.logger.debug(
+                "associations: %s",
+                [(_item[0], _item[1]._id) for _item in associations.items()],
+            )
+            self.logger.debug(f"unmatched_detections: {unmatched_detections}")
 
-        # Handle assigned trackers.
-        matched_trackers = self.handle_matched_trackers(
-            associations, detected_boxes, frame_num
-        )
+            # Handle assigned trackers.
+            matched_trackers = self.handle_matched_trackers(
+                associations, detected_boxes, frame_num
+            )
 
-        # Handle unassigned trackers.
-        unmatched_trackers = self.handle_unmatched_trackers(
-            unmatched_trackers_indices, frame_num, curr_time
-        )
+            # Handle unassigned trackers.
+            unmatched_trackers = self.handle_unmatched_trackers(
+                unmatched_trackers_indices, frame_num, curr_time
+            )
 
-        # Initialize new trackers.
-        new_trackers = self.initialize_new_trackers(
-            unmatched_detections, detected_boxes, frame_num, curr_time
-        )
-        self.trackers = matched_trackers
-        self.trackers.extend(unmatched_trackers)
-        self.trackers.extend(new_trackers)
+            # Initialize new trackers.
+            new_trackers = self.initialize_new_trackers(
+                unmatched_detections, detected_boxes, frame_num, curr_time
+            )
+            self.trackers = matched_trackers
+            self.trackers.extend(unmatched_trackers)
+            self.trackers.extend(new_trackers)
 
         for _tracker in self.trackers:
             _tracker.update_trajectory(frame_num)
@@ -158,6 +161,7 @@ class TrackerManager(TrackerMatcher):
                 "duration": getattr(tracker, "duration", None),
                 "start_frame": getattr(tracker, "start_frame", None),
                 "end_frame": getattr(tracker, "end_frame", None),
+                "nb_absences": getattr(tracker, "absences", None),
                 "trajectory": getattr(tracker, "trajectory", None),
                 "color": getattr(tracker, "color", None),
             }
@@ -181,95 +185,3 @@ class TrackerManager(TrackerMatcher):
 
         with open(self.output_json_path, "w", encoding="utf-8") as f:
             json.dump(result_data, f, indent=2)
-
-    def save_output_video(self, start, end, step):
-
-        with open(self.output_json_path, "r") as f:
-            res = json.load(f)
-
-        current_trajectories = {_tracker["_id"]: [] for _tracker in res["Detection"]}
-
-        cap = cv2.VideoCapture(self.input_video_path)
-        frame_num = start
-        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-
-        while frame_num < end:
-
-            success, frame = cap.read()
-            if not success:
-                break
-
-            if frame_num == start:
-                pass
-
-            elif frame_num % step == 0:
-
-                motion_boxes = res["motion_boxes"][str(frame_num)]
-
-                for x, y, w, h in motion_boxes:
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-                # Draw trajectories for “validated” trackers
-                for _tracker in res["Detection"]:
-                    if _tracker["trajectory"].get(str(frame_num), None) is not None:
-                        current_trajectories[_tracker["_id"]].append(
-                            _tracker["trajectory"][str(frame_num)]
-                        )
-                    if frame_num <= _tracker["end_frame"]:
-                        trajectory = current_trajectories[_tracker["_id"]]
-                        if trajectory:
-                            pts = np.array(trajectory, dtype=np.int32)
-                            pts = pts.reshape((-1, 1, 2))
-                            cv2.polylines(
-                                frame,
-                                [pts],
-                                isClosed=False,
-                                color=_tracker["color"],
-                                thickness=5,
-                            )
-                            cv2.putText(
-                                frame,
-                                str(_tracker["_id"]),
-                                trajectory[-1],
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                0.5,
-                                _tracker["color"],
-                                2,
-                            )
-
-            img_path = os.path.join(self.output_dir, f"out_frame{frame_num:04d}.png")
-            cv2.imwrite(img_path, frame)
-            frame_num += 1
-
-        cap.release()
-
-        self.concat_png_to_video(
-            folder=self.output_dir,
-            output_video_path=self.output_video_path,
-            step=step,
-            logger=self.logger,
-        )
-
-    @staticmethod
-    def concat_png_to_video(folder, output_video_path, step, logger, fps=30):
-
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-framerate",
-            str(fps),
-            "-pattern_type",
-            "glob",
-            "-i",
-            os.path.join(folder, "out_frame*.png"),
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            output_video_path,
-        ]
-        logger.debug(" ".join(cmd))
-
-        subprocess.run(cmd)
-
-        logger.info(f"Created video : {os.path.join(folder, output_video_path)}")

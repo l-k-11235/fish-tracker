@@ -22,8 +22,6 @@ class BackgroundSubtractor:
             thresh_val: intensity threshold for detecting movement.
             min_area: minimum surface to keep a blob.
         """
-        print(np.array_equal(frame, self.ref))
-        # Convertir en gris
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         background_gray = (
             cv2.cvtColor(self.ref, cv2.COLOR_BGR2GRAY)

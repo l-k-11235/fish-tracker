@@ -127,14 +127,9 @@ class ObjectDetector(BackgroundSubtractor):
         self.non_max_suppression(self.masked_frame)
 
 
-def init_worker(ref_frame):
-    global detector
+def detect_fishes_worker(frame, ref_frame):
     detector = ObjectDetector()
     detector.ref = ref_frame
-
-
-def detect_fishes_worker(frame_args):
-    frame_num, frame = frame_args
     detector.process_frame(frame)
 
     frame = detector.masked_frame
@@ -142,60 +137,75 @@ def detect_fishes_worker(frame_args):
     for x, y, w, h in detector.region_proposals:
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-    return frame_num, detector.region_proposals, frame
+    return detector.region_proposals, frame
 
 
-def detect_fishes_parallel(
-    cap,
-    first_frame,
-    start,
-    end,
-    step,
-    dump_masked_frames=False,
-    out_dir="/app/data/outputs",
-    in_dir="/app/data/inputs",
-    num_workers=8,
+def process_chunk(
+    video_path, start, end, step, reference_frame_path=None, dump_dir=None
 ):
 
-    tasks = []
-    detections = {}
-
-    frame_num = start
+    cap = cv2.VideoCapture(video_path)
     cap.set(cv2.CAP_PROP_POS_FRAMES, start)
 
-    if dump_masked_frames:
-        dump_dir = os.path.join(out_dir, "masked_frame")
-        os.makedirs(dump_dir, exist_ok=True)
+    if reference_frame_path:
+        ref_frame = cv2.imread(reference_frame_path)
+    else:
+        success, ref_frame = cap.read()
+        if not success:
+            return {}
+
+    detections = {}
+    frame_num = start
 
     while frame_num < end:
         success, frame = cap.read()
         if not success:
             break
 
-        if frame_num == start:
-            if first_frame is None:
-                reference_frame = frame.copy()
-            else:
-                reference_frame = cv2.imread(f"{in_dir}/{first_frame}")
+        if frame_num % step == 0:
+            region_proposals, processed_frame = detect_fishes_worker(frame, ref_frame)
+            detections[frame_num] = region_proposals
 
-        elif frame_num % step == 0:
-            tasks.append((frame_num, frame.copy()))
+            if dump_dir:
+                img_path = os.path.join(dump_dir, f"masked_frame{frame_num:04d}.png")
+                cv2.imwrite(img_path, processed_frame)
 
         frame_num += 1
 
-    with mp.Pool(
-        num_workers, initializer=init_worker, initargs=(reference_frame,)
-    ) as pool:
-        for frame_num, region_proposals, processed_frame in pool.imap_unordered(
-            detect_fishes_worker, tasks
-        ):
-
-            detections[frame_num] = region_proposals
-            if dump_masked_frames:
-                img_path = os.path.join(dump_dir, f"masked_frame{frame_num:04d}.png")
-                cv2.imwrite(img_path, processed_frame)
+    cap.release()
     return detections
 
 
-# 49s // 20 frames resize factor 0.5
+def detect_fishes_parallel(
+    video_path,
+    start,
+    end,
+    step,
+    output_dir,
+    reference_frame_path=None,
+    dump_masked_frames=False,
+    num_workers=8,
+    chunk_size=16,
+):
+    dump_dir = None
+    if dump_masked_frames:
+        dump_dir = os.path.join(output_dir, "masked_frame")
+        os.makedirs(dump_dir, exist_ok=True)
+
+    chunks = []
+    for chunk_start in range(start, end, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, end)
+        chunks.append(
+            (video_path, chunk_start, chunk_end, step, reference_frame_path, dump_dir)
+        )
+
+    all_detections = {}
+    with mp.Pool(num_workers) as pool:
+        results = pool.starmap(process_chunk, chunks)
+        for d in results:
+            all_detections.update(d)
+    return all_detections
+
+
+# 49s // 20 frames resize factor 0.5 --> 23s // 20 frames
 # 20s // 20 frames resize factor 0.25
