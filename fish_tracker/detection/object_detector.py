@@ -141,18 +141,26 @@ def detect_fishes_worker(frame, ref_frame):
 
 
 def process_chunk(
-    video_path, start, end, step, reference_frame_path=None, dump_dir=None
+    video_path,
+    start,
+    end,
+    step,
+    reference_frame_num=None,
+    reference_frame_path=None,
+    dump_dir=None,
 ):
 
-    cap = cv2.VideoCapture(video_path)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-
-    if reference_frame_path:
+    if reference_frame_path is not None:
         ref_frame = cv2.imread(reference_frame_path)
     else:
+        cap = cv2.VideoCapture(video_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, reference_frame_num)
         success, ref_frame = cap.read()
         if not success:
             return {}
+
+    cap = cv2.VideoCapture(video_path)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start)
 
     detections = {}
     frame_num = start
@@ -187,6 +195,7 @@ def detect_fishes_parallel(
     num_workers=8,
     chunk_size=16,
 ):
+    reference_frame_num = step if reference_frame_path is None else None
     dump_dir = None
     if dump_masked_frames:
         dump_dir = os.path.join(output_dir, "masked_frame")
@@ -196,7 +205,15 @@ def detect_fishes_parallel(
     for chunk_start in range(start, end, chunk_size):
         chunk_end = min(chunk_start + chunk_size, end)
         chunks.append(
-            (video_path, chunk_start, chunk_end, step, reference_frame_path, dump_dir)
+            (
+                video_path,
+                chunk_start,
+                chunk_end,
+                step,
+                reference_frame_num,
+                reference_frame_path,
+                dump_dir,
+            )
         )
 
     all_detections = {}

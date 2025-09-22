@@ -64,8 +64,8 @@ def write_trajectories_chunk(start, end, json_path, video_path, output_dir):
             for _t in res["Detection"]
             if (_t["start_frame"] <= frame_num <= _t["end_frame"])
         ]
-        if trackers:
-            write_trajectories(frame, frame_num, motion_boxes, trackers, output_dir)
+
+        write_trajectories(frame, frame_num, motion_boxes, trackers, output_dir)
         frame_num += 1
     cap.release()
 
