@@ -7,8 +7,7 @@ setup(
     install_requires=[
         "matplotlib",
         "numpy",
-        "opencv-python",
+        "opencv-contrib-python",
         "scipy",
-        
     ],
 )

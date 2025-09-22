@@ -1,77 +1,52 @@
 import cv2
+import numpy as np
 
 from fish_tracker.utils.logger import get_logger
 
 
 class BackgroundSubtractor:
 
-    def __init__(
-        self,
-        reference_frame=None,
-        gaussian_blur_size=21,
-        binary_threshold=30,
-        kernel_size=5,  # for morphological transformations
-        dilatation_iter=5,
-        morphological_gradient_iter=1,
-        log_level="INFO",
-    ):
-
-        self.gaussian_blur_size = gaussian_blur_size
-        self.binary_threshold = binary_threshold
-        self.kernel_size = kernel_size
-        self.dilatation_iter = dilatation_iter
-        self.morphological_gradient_iter = morphological_gradient_iter
+    def __init__(self):
         self.logger = get_logger("BackgroundSubstractor")
         self.logger.info("BackgroundSubstractor Initialization")
-        if isinstance(reference_frame, str):
-            self.ref = cv2.imread(reference_frame)
-        else:
-            self.ref = reference_frame
-        self.logger.debug(type(self.ref))
-        self.delta_frame = None
+        self.ref = None
+        self.motion_mask = None
+        self.mask_sum = None
+        self.boxes = []
 
-        self.set_reference_frame()
-
-    def convert_to_grayscale(self, frame):
+    def get_motion_mask(self, frame, thresh_val=30, min_area=500):
+        """
+        Calculates a binary mask of the motion areas.
+        Args:
+            frame: current image (BGR).
+            thresh_val: intensity threshold for detecting movement.
+            min_area: minimum surface to keep a blob.
+        """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(
-            gray, (self.gaussian_blur_size, self.gaussian_blur_size), 0
+        background_gray = (
+            cv2.cvtColor(self.ref, cv2.COLOR_BGR2GRAY)
+            if len(self.ref.shape) == 3
+            else self.ref
         )
-        return gray
 
-    def set_reference_frame(self):
-        self.ref = self.convert_to_grayscale(self.ref)
+        diff = cv2.absdiff(gray, background_gray)
 
-    def set_delta_frame(self, frame):
+        diff = cv2.GaussianBlur(diff, (5, 5), 0)
 
-        if self.ref is None:
-            raise ValueError("Reference frame not set. Call set_reference_frame first.")
+        _, motion_mask = cv2.threshold(diff, thresh_val, 255, cv2.THRESH_BINARY)
 
-        # Grayscale conversion
-        gray = self.convert_to_grayscale(frame)
+        kernel = np.ones((5, 5), np.uint8)
+        motion_mask = cv2.morphologyEx(motion_mask, cv2.MORPH_OPEN, kernel)
+        self.motion_mask = cv2.morphologyEx(motion_mask, cv2.MORPH_CLOSE, kernel)
+        self.mask_sum = self.motion_mask.sum()
 
-        # Difference
-        delta_frame = cv2.absdiff(self.ref, gray)
-
-        # Binary
-        delta_frame = cv2.threshold(
-            delta_frame,
-            self.binary_threshold,
-            255,
-            cv2.THRESH_BINARY,
-            # 255 -> white
-        )[1]
-
-        # Kernel for morpholofical transformations
-        kernel = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE, (self.kernel_size, self.kernel_size)
+        # Detect contours.
+        contours, _ = cv2.findContours(
+            motion_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
-        # Dilatation
-        delta_frame = cv2.dilate(delta_frame, kernel, iterations=self.dilatation_iter)
-        # Morphological Gradient to get contours
-        self.delta_frame = cv2.morphologyEx(
-            delta_frame,
-            cv2.MORPH_CLOSE,
-            kernel,
-            iterations=self.morphological_gradient_iter,
-        )
+
+        self.boxes = []
+        for c in contours:
+            if cv2.contourArea(c) >= min_area:
+                x, y, w, h = cv2.boundingRect(c)
+                self.boxes.append((x, y, w, h))

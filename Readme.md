@@ -52,7 +52,7 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 
 ## Features
 
-    Contour-based fish detection via background subtraction.
+    Fish detection via motion-masked selective search (a region proposal method used in R-CNN) with non-maximum suppression.
 
     Kalman filter tracker (extensible).
 
@@ -102,16 +102,16 @@ fish-tracker:latest \
 
 ## Parameters
 
-| Argument                  | Description                      | Default       |
-| ------------------------- | -------------------------------- | ------------- |
-| `--input_video_name`      | Input video path                 | *Required*    |
-| `--first_frame`           | First frame                      |  None         |
-| `--output_video_name`     | Output annotated video           | `output.mp4`  |
-| `--output_json_name`      | Output JSON file                 | `output.json` |
-| `--min_area`              | Minimum contour area             | `2000`        |
-| `--distance_threshold`    | Matching distance threshold      | `100`         |
-| `--max_absences`          | Max frame absences for a tracker | `3`           |
-| `--min_tracking_duration` | Minimum duration to keep tracker | `0.5`         |
-| `--step`                  | Process every `step` frames      | `1`           |
-| `--start`, `--end`        | Frame range                      | `0`, `None`   |
-| `--log_level`             | Level of logging                 | `INFO`        |
+| Argument                  | Description                          | Default       |
+| ------------------------- | -------------------------------------| ------------- |
+| `--input_video_name`      | Input video path                     | *Required*    |
+| `--first_frame`           | First frame                          | `None`        |
+| `--output_video_name`     | Output annotated video               | `output.mp4`  |
+| `--output_json_name`      | Output JSON file                     | `output.json` |
+| `--dump_masked_frame`     | Dump frames with motion mask (flag)  | `False`       |
+| `--distance_threshold`    | Matching distance threshold          | `200`         |
+| `--max_absences`          | Max frame absences for a tracker     | `1`           |
+| `--min_tracking_duration` | Minimum duration (s) to keep tracker | `0`           |
+| `--step`                  | Process every `step` frames          | `5`           |
+| `--start`, `--end`        | Frame range                          | `0`, `None`   |
+| `--log_level`             | Level of logging                     | `INFO`        |

@@ -6,16 +6,18 @@ from fish_tracker.utils.logger import get_logger
 
 class TrackerMatcher:
 
-    def __init__(self, distance_threshold, **kwargs):
+    def __init__(self, frame_height, frame_width, distance_threshold=200, **kwargs):
 
         self.logger = get_logger("TrackerMatcher")
         self.logger.info("TrackerMatcher Initialization")
 
+        self.frame_height = frame_height
+        self.frame_width = frame_width
         self.distance_threshold = distance_threshold
 
     @staticmethod
     def compute_cost_matrix(trackers, detected_boxes):
-        """Cost matrix based on the euclidian"""
+        """Cost matrix based on the euclidian distance"""
 
         if len(trackers) == 0 or len(detected_boxes) == 0:
             return np.zeros((len(trackers), len(detected_boxes)))
@@ -30,48 +32,37 @@ class TrackerMatcher:
         return cost_matrix
 
     def make_associations(self, trackers, detected_boxes):
+
+        if len(trackers) == 0 or len(detected_boxes) == 0:
+            return {}, set(range(len(trackers))), set(range(len(detected_boxes)))
+
         # Cost Matrix
         cost_matrix = self.compute_cost_matrix(trackers, detected_boxes)
 
-        # Global optimal assignment (one box-one tracker)
+        # Hungarian (global optimal assignment)
         row_ind, col_ind = linear_sum_assignment(cost_matrix)
-        base_associations = {
-            int(j): [int(i)]
-            for i, j in zip(row_ind, col_ind)
-            if cost_matrix[i, j] < self.distance_threshold
-        }
-        self.logger.debug("Global optimal assignment")
+
+        # valid matches
+        matches = {}
+        for i, j in zip(row_ind, col_ind):
+            if cost_matrix[i, j] < self.distance_threshold:
+                matches[j] = [i]
+
         for i, j in zip(row_ind, col_ind):
             self.logger.debug(
-                "%d, %d, %f %f", i, j, cost_matrix[i, j], self.distance_threshold
+                "tracker=%d, box=%d, cost=%.3f (th=%.3f)",
+                i,
+                j,
+                cost_matrix[i, j],
+                self.distance_threshold,
             )
 
-        assigned_boxes = set(base_associations.keys())
-        assigned_trackers = set().union(*base_associations.values())
-
-        # For each box, look for other close trackers
-        self.logger.debug("Search for other matches")
-        for j, _box in enumerate(detected_boxes):
-            for i, _tracker in enumerate(trackers):
-                if i in assigned_trackers:
-                    continue
-                dist = _tracker.distance_to_box(_box)
-                self.logger.debug(f"{i}, {j}, {dist} {self.distance_threshold}")
-
-                if dist < self.distance_threshold:
-                    if j not in base_associations:
-                        base_associations[j] = []
-                    base_associations[j].append(i)
-                    assigned_trackers.add(i)
-                    assigned_boxes.add(j)
-
-        # Unassigned trackers
+        assigned_trackers = set(i for v in matches.values() for i in v)
+        assigned_boxes = set(matches.keys())
         unassigned_trackers = set(range(len(trackers))) - assigned_trackers
-
-        # Unasigned boxes
         unassigned_detections = set(range(len(detected_boxes))) - assigned_boxes
 
-        return base_associations, unassigned_trackers, unassigned_detections
+        return matches, unassigned_trackers, unassigned_detections
 
     def merge_multiple_associations(self, associations, trackers):
         for box_idx, tracker_indices in associations.items():
