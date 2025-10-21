@@ -1,0 +1,55 @@
+name: CI Fish Tracker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Set up Python for linting
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # Install Black and Flake8
+      - name: Install linters
+        run: |
+          pip install black flake8
+
+      # Run Black
+      - name: Run Black
+        run: |
+          black --check fish_tracker/
+
+      # Run Flake8
+      - name: Run Flake8
+        run: |
+          flake8 fish_tracker/
+
+      # Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t fish-tracker-test -f docker/Dockerfile .
+
+      # Run a minimal inference to test the pipeline
+      - name: Run minimal tracking example
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/data/examples:/app/data \
+            fish-tracker-test \
+            python -m fish_tracker.core.main \
+              --input_video_name WellsDam_1_East_20170627_13_210-240.mp4 \
+              --first_frame WellsDam_1_East_20170627_13_first_frame.png \
+              --output_video_name output_test.mp4 \
+              --output_json_name output_test.json \
+              --end 3
