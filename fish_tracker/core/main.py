@@ -1,15 +1,15 @@
 import argparse
 import cv2
-import json
 import logging
 import os
+import pickle
 import random
 import time
 
 from datetime import datetime
 
 from fish_tracker.utils.logger import get_logger, set_global_log_level, set_log_file
-from fish_tracker.detection.object_detector import detect_fishes_parallel
+from fish_tracker.detection.object_detector import run_roi_detection
 from fish_tracker.core.tracker_manager import TrackerManager
 from fish_tracker.core.output_writer import save_output_frames, concat_frames_to_video
 
@@ -54,10 +54,36 @@ def parse_args():
         help="Dump masked frames (disabled by default).",
     )
     parser.add_argument(
+        "--detector_type",
+        "-detector_type",
+        type=str,
+        default="selective_search",
+        choices=["selective_search", "yolo_seg"],
+        required=False,
+        help=("Method used for ROI detection."),
+    )
+    parser.add_argument(
+        "--matching_method",
+        "--matching_method",
+        type=str,
+        default="hybrid",
+        choices=["geometric", "embedding", "hybrid"],
+        required=False,
+        help=("Method used for ROI detection."),
+    )
+    parser.add_argument(
+        "--alpha",
+        "--alpha",
+        type=float,
+        default=0.5,
+        required=False,
+        help=("The weight of the geometric distance in the hybrid method"),
+    )
+    parser.add_argument(
         "--distance_threshold",
         "-dist",
         type=float,
-        default=200,
+        default=0.5,
         required=False,
         help=(
             "Minimum distance to preserve " "a match between a tracker and a contour."
@@ -67,7 +93,7 @@ def parse_args():
         "--max_absences",
         "-ab",
         type=int,
-        default=1,
+        default=2,
         required=False,
         help=("Maximum number of consecutive frames " "without a match for a tracker."),
     )
@@ -104,6 +130,30 @@ def parse_args():
         help="Index of the last frame to read from the video.",
     )
     parser.add_argument(
+        "--num_workers",
+        "-num_workers",
+        type=int,
+        default=8,
+        required=False,
+        help=(
+            "Number of parallel worker processes used for fish detection when using "
+            "the Selective Search detector. Ignored when using YOLO segmentation."
+        ),
+    )
+    parser.add_argument(
+        "--chunk_size",
+        "-chunk_size",
+        type=int,
+        default=8,
+        required=False,
+        help=(
+            "Number of frames processed together per iteration. "
+            "Interpreted as the chunk size for Selective Search (CPU) "
+            "or as the batch size for YOLO segmentation."
+        ),
+    )
+
+    parser.add_argument(
         "--log_level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
@@ -131,6 +181,11 @@ def fish_tracking(
     first_frame,
     output_video_name,
     output_json_name,
+    detector_type,
+    matching_method,
+    alpha,
+    num_workers,
+    chunk_size,
     dump_masked_frames,
     distance_threshold,
     max_absences,
@@ -139,6 +194,9 @@ def fish_tracking(
     start,
     end,
     log_level,
+    embedding_model_name="mobilenetv3small",
+    yolo_model_path="data/models/yolov8n-seg.pt",
+    yolo_conf_thresh=0.0005,
 ):
     output_dir = "/app/data/outputs"
     input_dir = "/app/data/inputs"
@@ -164,67 +222,85 @@ def fish_tracking(
 
     random.seed(42)
 
-    # ############## #
-    # Fish detection #
-    # ############## #
-    detections_path = "/app/data/outputs/detections.json"
-    if not os.path.exists(detections_path):
+    # #################### #
+    # Regions of interest #
+    # ################### #
+    roi_path = "/app/data/outputs/roi.pickle"
+    if not os.path.exists(roi_path):
         beg = time.time()
-        detections = detect_fishes_parallel(
-            video_path, start, end, step, output_dir, ref_frame_path, dump_masked_frames
+        detector_kwargs = {"embedding_model_name": embedding_model_name}
+        if detector_type == "yolo_seg":
+            detector_kwargs["yolo_model_path"] = yolo_model_path
+            detector_kwargs["yolo_conf_thresh"] = yolo_conf_thresh
+        roi = run_roi_detection(
+            video_path=video_path,
+            detector_type=detector_type,
+            start=start,
+            end=end,
+            step=step,
+            output_dir=output_dir,
+            reference_frame_path=ref_frame_path,
+            dump_masked_frames=dump_masked_frames,
+            num_workers=num_workers,
+            chunk_size=chunk_size,
+            detector_kwargs=detector_kwargs,
         )
-        logger.info(f"Detection took: {round(time.time() - beg)}s")
-        with open(detections_path, "w", encoding="utf-8") as f:
-            json.dump(detections, f, indent=2)
+        logger.info(
+            f"Calculation of regions of interest took: {round(time.time() - beg)}s"
+        )
+        with open(roi_path, "wb") as handle:
+            pickle.dump(roi, handle, protocol=pickle.HIGHEST_PROTOCOL)
     else:
         logger.info("Detections have already been calculated.")
-    with open(detections_path, "r") as f:
-        detections = json.load(f)
 
-        # ######## #
-        # Tracking #
-        # ######## #
+    # ######## #
+    # Tracking #
+    # ######## #
 
-        beg = time.time()
-        manager = TrackerManager(
-            motion_boxes=detections,
-            frame_height=frame_height,
-            frame_width=frame_width,
-            max_absences=max_absences,
-            min_tracking_duration=min_tracking_duration,
-            distance_threshold=distance_threshold,
-            fps=fps,
-            input_video_name=input_video_name,
-            output_json_name=output_json_name,
-            log_level=log_level,
-        )
+    with open(roi_path, "rb") as handle:
+        roi = pickle.load(handle)
 
-        for _frame_num in range(start + 1, end):
-            logger.debug(f"Frame {_frame_num}")
-            detected_boxes = detections.get(str(_frame_num), [])
-            curr_time = (_frame_num - start) / fps
-            manager.process(_frame_num, curr_time, detected_boxes)
+    beg = time.time()
+    manager = TrackerManager(
+        frame_height=frame_height,
+        frame_width=frame_width,
+        method=matching_method,
+        alpha=alpha,
+        distance_threshold=distance_threshold,
+        max_absences=max_absences,
+        min_tracking_duration=min_tracking_duration,
+        fps=fps,
+        input_video_name=input_video_name,
+        output_json_name=output_json_name,
+    )
+    for _frame_num in range(start + 1, end):
+        logger.debug(f"Frame {_frame_num}")
+        frame_detections = roi.get(_frame_num, [])
+        curr_time = (_frame_num - start) / fps
+        manager.process(_frame_num, curr_time, frame_detections, step)
 
-        # ########################## #
-        # Terminate running trackers #
-        # ########################## #
-        manager.terminate(_frame_num, curr_time)
-        logger.info(f"Tracking took: {round(time.time() - beg, 2)}s")
+    manager.terminate(_frame_num, curr_time)
+    logger.info(f"Tracking took: {round(time.time() - beg, 2)}s")
 
-        # ##########
-        # # Result #
-        # ##########
-        beg = time.time()
-        manager.save_results(curr_time)
-        save_output_frames(
-            start, end, output_json_path, video_path, output_dir, manager.logger
-        )
-        concat_frames_to_video(
-            folder=output_dir,
-            output_video_path=output_video_path,
-            logger=manager.logger,
-            fps=fps,
-        )
+    # ##########
+    # # Result #
+    # ##########
+    beg = time.time()
+    motion_boxes = {
+        frame_id: [det["box"] for det in frame_dets]
+        for frame_id, frame_dets in roi.items()
+    }
+
+    manager.save_results(motion_boxes, curr_time)
+    save_output_frames(
+        start, end, output_json_path, video_path, output_dir, manager.logger
+    )
+    concat_frames_to_video(
+        folder=output_dir,
+        output_video_path=output_video_path,
+        logger=manager.logger,
+        fps=fps,
+    )
     logger.info(f"Saving took: {round(time.time() - beg, 2)}s")
 
 
@@ -235,6 +311,9 @@ if __name__ == "__main__":
         first_frame=args.first_frame,
         output_video_name=args.output_video_name,
         output_json_name=args.output_json_name,
+        detector_type=args.detector_type,
+        matching_method=args.matching_method,
+        alpha=args.alpha,
         dump_masked_frames=args.dump_masked_frames,
         distance_threshold=args.distance_threshold,
         max_absences=args.max_absences,
@@ -242,5 +321,7 @@ if __name__ == "__main__":
         step=args.step,
         start=args.start,
         end=args.end,
+        num_workers=args.num_workers,
+        chunk_size=args.chunk_size,
         log_level=args.log_level,
     )

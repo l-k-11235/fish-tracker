@@ -10,10 +10,8 @@ class KalmanObjectTracker(BaseTracker):
     A tracker using a Kalman filter to estimate object position over time.
     """
 
-    def __init__(
-        self, start_frame: int, start_time: float, x0: float, y0: float
-    ) -> None:
-        super().__init__(start_frame, start_time, x0, y0)
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._build_Kalman_filter()
 
     def _build_Kalman_filter(self):
