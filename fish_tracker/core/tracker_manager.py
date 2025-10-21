@@ -8,23 +8,20 @@ class TrackerManager(TrackerMatcher):
 
     def __init__(
         self,
-        motion_boxes,
         max_absences,
         min_tracking_duration,
         fps,
         input_video_name,
         output_json_name,
         tracker_class=None,
-        log_level="INFO",
         **kwargs,
     ):
 
-        super().__init__(log_level=log_level, **kwargs)
+        super().__init__(**kwargs)
 
         self.logger = get_logger("TrackerManager")
         self.logger.info("TrackerManager Initialization")
 
-        self.motion_boxes = motion_boxes
         self.max_absences = max_absences
         self.min_tracking_duration = min_tracking_duration
         self.fps = fps
@@ -32,9 +29,10 @@ class TrackerManager(TrackerMatcher):
         self.input_dir = "/app/data/input"
         self.output_dir = "/app/data/outputs"
         self.input_video_path = f"/app/data/inputs/{input_video_name}"
-        # self.output_video_path = f"/app/data/outputs/{output_video_name}"
         self.output_json_path = f"/app/data/outputs/{output_json_name}"
 
+        self.motion_boxes = []
+        self.embeddings = []
         self.trackers = []
         self.finished = []
         self.trashed = []
@@ -46,53 +44,45 @@ class TrackerManager(TrackerMatcher):
         else:
             self.tracker_class = tracker_class
 
-    def handle_matched_trackers(self, associations, detected_boxes, frame_num):
+    def handle_matched_trackers(self, matches, frame_num):
 
-        matched_trackers = []
+        for match in matches:
+            match["tracker"].absences = 0
+            match["tracker"].correct_prediction(match["detection"]["box"], frame_num)
+            match["tracker"].embedding = match["detection"]["embedding"]
 
-        for _box_id, _tracker in associations.items():
-            _tracker.absences = 0
-            _tracker.correct_prediction(detected_boxes[_box_id], frame_num)
-            matched_trackers.append(_tracker)
+    def handle_unmatched_trackers(self, unassigned_trackers, frame_num, curr_time):
 
-        return matched_trackers
-
-    def handle_unmatched_trackers(
-        self, unmatched_trackers_indices, frame_num, curr_time
-    ):
-        unmatched_trackers = []
-        for r in unmatched_trackers_indices:
-            tracker = self.trackers[r]
-            self.logger.debug(f"unmatched_tracker {tracker._id}")
-            tracker.absences += 1
-            if tracker.absences > self.max_absences:
-                tracker.terminate(frame_num, curr_time)
+        for _tracker in unassigned_trackers:
+            _tracker.absences += 1
+            self.logger.debug(f"{_tracker.absences} absences, max {self.max_absences}")
+            if _tracker.absences >= self.max_absences:
+                _tracker.terminate(frame_num, curr_time)
+                self.trackers = [t for t in self.trackers if t._id != _tracker._id]
                 self.logger.debug("terminated")
-                if tracker.duration > self.min_tracking_duration:
-                    self.finished.append(tracker)
+                if _tracker.duration > self.min_tracking_duration:
+                    self.finished.append(_tracker)
                 else:
                     self.logger.debug("trashed")
-                    self.trashed.append(tracker)
-            else:
-                unmatched_trackers.append(tracker)
-        return unmatched_trackers
+                    self.trashed.append(_tracker)
 
-    def initialize_new_trackers(
-        self, unmatched_detections, detected_boxes, frame_num, curr_time
-    ):
+    def initialize_new_trackers(self, unassigned_detections, frame_num, curr_time):
 
-        new_trackers = []
-        for c in unmatched_detections:
-            bbox = detected_boxes[c]
+        for _detection in unassigned_detections:
+            bbox = _detection["box"]
             x0 = bbox[0] + bbox[2] / 2
             y0 = bbox[1] + bbox[3] / 2
-            tracker = self.tracker_class(frame_num, curr_time, x0, y0)
+            tracker = self.tracker_class(
+                start_frame=frame_num,
+                start_time=curr_time,
+                x0=x0,
+                y0=y0,
+                embedding=_detection["embedding"],
+            )
             self.logger.debug(f"Initialized tracker {tracker._id}")
-            new_trackers.append(tracker)
+            self.trackers.append(tracker)
 
-        return new_trackers
-
-    def process(self, frame_num, curr_time, detected_boxes):
+    def process(self, frame_num, curr_time, detections, step):
 
         self.frame_num = frame_num
         self.curr_time = curr_time
@@ -101,41 +91,25 @@ class TrackerManager(TrackerMatcher):
         for _tracker in self.trackers:
             _tracker.predict()
 
-        if detected_boxes:
+        if (frame_num % step) == 0:
             self.logger.debug(
                 "Running trackers: %s",
                 [(_t._id, _t.absences) for _t in self.trackers],
             )
-            self.logger.debug(f"{len(detected_boxes)} detected_boxes")
+            self.logger.debug(f"{len(detections)} detections")
+
             # Map boxes with trackers.
-            (associations, unmatched_trackers_indices, unmatched_detections) = (
-                self.make_associations(self.trackers, detected_boxes)
+            (matches, unassigned_trackers, unassigned_detections) = (
+                self.make_associations(self.trackers, detections)
             )
-            associations = self.merge_multiple_associations(associations, self.trackers)
 
-            self.logger.debug(
-                "associations: %s",
-                [(_item[0], _item[1]._id) for _item in associations.items()],
-            )
-            self.logger.debug(f"unmatched_detections: {unmatched_detections}")
-
-            # Handle assigned trackers.
-            matched_trackers = self.handle_matched_trackers(
-                associations, detected_boxes, frame_num
-            )
+            self.handle_matched_trackers(matches, frame_num)
 
             # Handle unassigned trackers.
-            unmatched_trackers = self.handle_unmatched_trackers(
-                unmatched_trackers_indices, frame_num, curr_time
-            )
+            self.handle_unmatched_trackers(unassigned_trackers, frame_num, curr_time)
 
             # Initialize new trackers.
-            new_trackers = self.initialize_new_trackers(
-                unmatched_detections, detected_boxes, frame_num, curr_time
-            )
-            self.trackers = matched_trackers
-            self.trackers.extend(unmatched_trackers)
-            self.trackers.extend(new_trackers)
+            self.initialize_new_trackers(unassigned_detections, frame_num, curr_time)
 
         for _tracker in self.trackers:
             _tracker.update_trajectory(frame_num)
@@ -150,7 +124,7 @@ class TrackerManager(TrackerMatcher):
             else:
                 self.trashed.append(_tracker)
 
-    def save_results(self, time):
+    def save_results(self, motion_boxes, time):
         """
         Saves tracking results (valid and rejected trackers).
         """
@@ -170,7 +144,7 @@ class TrackerManager(TrackerMatcher):
             "nb_detected": len(self.finished),
             "nb_trashed": len(self.trashed),
             "current_time": time,
-            "motion_boxes": self.motion_boxes,
+            "motion_boxes": motion_boxes,
         }
 
         if self.finished:

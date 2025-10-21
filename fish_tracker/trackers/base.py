@@ -9,7 +9,7 @@ class BaseTracker(ABC):
     """Abstract base class for all object trackers."""
 
     def __init__(
-        self, start_frame: int, start_time: float, x0: float, y0: float
+        self, start_frame: int, start_time: float, x0: float, y0: float, embedding
     ) -> None:
         """
         Initialize a tracker.
@@ -24,6 +24,7 @@ class BaseTracker(ABC):
         self.absences = 0
         self.x = x0
         self.y = y0
+        self.embedding = embedding
         self.trajectory = {start_frame: (int(self.x), int(self.y))}
         self.end_time = None
         self.duration = None

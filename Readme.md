@@ -14,7 +14,6 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 ├── docker
 │   ├── build.sh
 │   ├── Dockerfile
-│   └── run.sh
 ├── fish_tracker
 │   ├── __init__.py
 │   ├── core
@@ -22,6 +21,7 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 │   │   ├── main.py
 │   │   ├── tracker_manager.py
 │   │   └── tracker_matcher.py
+│   │   └── output_writer.py
 │   ├── detection
 │   │   ├── __init__.py
 │   │   ├── object_detector.py
@@ -32,6 +32,7 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 │   └── utils
 │       ├── __init__.py
 │       ├── background.py
+│       ├── embedding.py
 │       ├── logger.py
 ├── data
 │   ├── examples
@@ -45,6 +46,8 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 │   │   └── outputs_WellsDam_1_East_20170627_13_210-240
 │   │       ├── output.json
 │   │       └── output.mp4
+│   ├── models
+│   │   └── yolov8n-seg.pt
 ├── Readme.md
 ├── setup.py
 └── requirements.txt
@@ -52,13 +55,19 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 
 ## Features
 
-    Fish detection via motion-masked selective search (a region proposal method used in R-CNN) with non-maximum suppression.
+    Two ROI detection backends (selectable):
+        - Motion-masked Selective Search (as in R-CNN)
+        - YOLO-based neural detector filtered by motion masking.
+
+    Non-Maximum Suppression to remove redundant overlapping boxes
+
+    Multiple similarity metrics for data association: Euclidean, cosine, and hybrid (with MobileNet-based embeddings)
 
     Kalman filter tracker (extensible).
 
-    Track management with lifecycle: initialized, active, finished, trashed.
+    Track lifecycle management: initialized → active → finished → trashed
 
-    Exports tracking results to JSON.
+    JSON export of tracking results
 
     Video rendering with annotated trajectories.
 
@@ -102,16 +111,21 @@ fish-tracker:latest \
 
 ## Parameters
 
-| Argument                  | Description                          | Default       |
-| ------------------------- | -------------------------------------| ------------- |
-| `--input_video_name`      | Input video path                     | *Required*    |
-| `--first_frame`           | First frame                          | `None`        |
-| `--output_video_name`     | Output annotated video               | `output.mp4`  |
-| `--output_json_name`      | Output JSON file                     | `output.json` |
-| `--dump_masked_frame`     | Dump frames with motion mask (flag)  | `False`       |
-| `--distance_threshold`    | Matching distance threshold          | `200`         |
-| `--max_absences`          | Max frame absences for a tracker     | `1`           |
-| `--min_tracking_duration` | Minimum duration (s) to keep tracker | `0`           |
-| `--step`                  | Process every `step` frames          | `5`           |
-| `--start`, `--end`        | Frame range                          | `0`, `None`   |
-| `--log_level`             | Level of logging                     | `INFO`        |
+| Argument                  | Description                           | Default            |
+| ------------------------- | --------------------------------------|--------------------|
+| `--input_video_name`      | Input video path                      | *Required*         |
+| `--first_frame`           | First frame                           | `None`             |
+| `--output_video_name`     | Output annotated video                | `output.mp4`       |
+| `--output_json_name`      | Output JSON file                      | `output.json`      |
+| `--dump_masked_frames`    | Dump frames with motion mask (flag)   | `False`            |
+| `--detector_type`         | Method used for ROI detection.        | `selective_search` |
+| `--matching_method`       | Method used to match trackers and ROI | `hybrid`           |
+| `--alpha`                 | Weight of the geometric distance<br>in the hybrid method | `0.5`           |
+| `--distance_threshold`    | Matching distance threshold           | `200`              |
+| `--max_absences`          | Max frame absences for a tracker      | `2`                |
+| `--min_tracking_duration` | Minimum duration (s) to keep tracker  | `0`                |
+| `--step`                  | Process every `step` frames           | `5`                |
+| `--start`, `--end`        | Frame range                           | `0`, `None`        |
+| `--num_workers`         | Nb of parallel processes used for<br>detection (selective search) | `8` |                            |
+| `--chunk_size`            | Nb of frames processed together       | `8`                |
+| `--log_level`             | Level of logging                      | `INFO`             |
