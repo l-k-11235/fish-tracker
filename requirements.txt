@@ -1,7 +1,4 @@
 matplotlib
 numpy
-opencv-contrib-python
+pydantic>=2.0, <3.0
 scipy
-torch
-torchvision
-ultralytics

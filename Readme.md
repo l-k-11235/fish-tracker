@@ -22,9 +22,13 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 │   │   ├── tracker_manager.py
 │   │   └── tracker_matcher.py
 │   │   └── output_writer.py
-│   ├── detection
+│   ├── detectors
 │   │   ├── __init__.py
-│   │   ├── object_detector.py
+│   │   ├── base.py
+│   │   ├── selective_search.py
+│   │   ├── yolo_seg.py
+│   │   ├── worker.py
+│   │   ├── roi_detection.py
 │   ├── trackers
 │   │   ├── __init__.py
 │   │   ├── base.py
@@ -32,7 +36,8 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 │   └── utils
 │       ├── __init__.py
 │       ├── background.py
-│       ├── embedding.py
+│       ├── config.py
+│       ├── roi_processor.py
 │       ├── logger.py
 ├── data
 │   ├── examples
@@ -119,7 +124,7 @@ fish-tracker:latest \
 | `--output_json_name`      | Output JSON file                      | `output.json`      |
 | `--dump_masked_frames`    | Dump frames with motion mask (flag)   | `False`            |
 | `--detector_type`         | Method used for ROI detection.        | `selective_search` |
-| `--matching_method`       | Method used to match trackers and ROI | `hybrid`           |
+| `--matching_method`       | Method used to match trackers and ROI | `geometric`           |
 | `--alpha`                 | Weight of the geometric distance<br>in the hybrid method | `0.5`           |
 | `--distance_threshold`    | Matching distance threshold           | `200`              |
 | `--max_absences`          | Max frame absences for a tracker      | `2`                |

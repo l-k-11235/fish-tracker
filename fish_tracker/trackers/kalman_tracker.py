@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-import random
 
+from fish_tracker.utils.configs import TrackerConfig
 from fish_tracker.trackers.base import BaseTracker
 
 
@@ -10,8 +10,8 @@ class KalmanObjectTracker(BaseTracker):
     A tracker using a Kalman filter to estimate object position over time.
     """
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, config: TrackerConfig) -> None:
+        super().__init__(config)
         self._build_Kalman_filter()
 
     def _build_Kalman_filter(self):
@@ -33,11 +33,6 @@ class KalmanObjectTracker(BaseTracker):
         # Initialize with first position (zero speed).
         self.kf.statePost = np.array([[self.x], [self.y], [0], [0]], dtype=np.float32)
         self.kf.errorCovPost = np.eye(4, dtype=np.float32)
-
-    @staticmethod
-    def _pick_random_color():
-        color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        return color
 
     def predict(self):
         prediction = self.kf.predict()
@@ -62,4 +57,4 @@ class KalmanObjectTracker(BaseTracker):
         self.kf.correct(measurement)
         self.x = measurement[0, 0]
         self.y = measurement[1, 0]
-        self.box = bbox
+        self.box: tuple[int, int, int, int] = bbox
