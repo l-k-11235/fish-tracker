@@ -19,7 +19,12 @@ class SelectiveSearchDetector(ObjectDetector[SelectiveSearchDetectorConfig]):
         assert self.diff_image_rgb is not None
         frame = self.diff_image_rgb
         if self.config.resize_factor != 1.0:
-            small_frame = cv2.resize(frame, (0, 0), fx=self.config.resize_factor, fy=self.config.resize_factor)
+            small_frame = cv2.resize(
+                frame,
+                (0, 0),
+                fx=self.config.resize_factor,
+                fy=self.config.resize_factor,
+            )
         else:
             small_frame = frame
 
@@ -39,20 +44,23 @@ class SelectiveSearchDetector(ObjectDetector[SelectiveSearchDetectorConfig]):
         ]
 
     def process_chunk(
-            self, 
-            video_path: str,
-            start: int,
-            end: int,
-            step: int,
-            ref_frame_path: str | None,
-            dump_dir: str | None) -> dict[int, list[ROIResult]]:
+        self,
+        video_path: str,
+        start: int,
+        end: int,
+        step: int,
+        ref_frame_path: str | None,
+        dump_dir: str | None,
+    ) -> dict[int, list[ROIResult]]:
         from .worker import frames_generator
+
         detections: dict[int, list[ROIResult]] = {}
-        for frame_num, frame, ref_frame in frames_generator(video_path, start, end, step, ref_frame_path):
+        for frame_num, frame, ref_frame in frames_generator(
+            video_path, start, end, step, ref_frame_path
+        ):
             _, diff = self.background_subtractor.apply(frame, ref_frame)
             self.diff_image_rgb = diff
             detections[frame_num] = self.process(frame)
             if dump_dir is not None:
                 self.dump_processed_frame(dump_dir, frame_num)
         return detections
-
