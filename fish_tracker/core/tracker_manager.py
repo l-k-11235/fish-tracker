@@ -1,4 +1,6 @@
 import json
+import numpy as np
+
 from torch import Tensor
 
 from fish_tracker.core.tracker_matcher import Match, TrackerMatcher
@@ -139,6 +141,15 @@ class TrackerManager(TrackerMatcher):
                 "color": getattr(tracker, "color", None),
             }
 
+        def to_serializable(obj):
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return obj  # default case
+
         result_data = {
             "nb_detected": len(self.finished),
             "nb_trashed": len(self.trashed),
@@ -157,4 +168,4 @@ class TrackerManager(TrackerMatcher):
             result_data["Trash"] = []
 
         with open(self.output_json_path, "w", encoding="utf-8") as f:
-            json.dump(result_data, f, indent=2)
+            json.dump(result_data, f, indent=2, default=to_serializable)

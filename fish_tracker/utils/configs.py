@@ -2,6 +2,7 @@
 import argparse
 import warnings
 
+from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal, Tuple, Union
 
@@ -16,10 +17,10 @@ class VideoParams(BaseModel):
     fps: int = Field(..., description="Frames per second of the video")
 
     @classmethod
-    def from_video(cls, video_path: str) -> "VideoParams":
+    def from_video(cls, video_path: Path) -> "VideoParams":
         import cv2
 
-        cap = cv2.VideoCapture(video_path)
+        cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
             warnings.warn(f"Unable to open video {video_path}")
             return cls(frame_width=0, frame_height=0, nb_frames=0, fps=0)
@@ -85,7 +86,7 @@ class SelectiveSearchDetectorConfig(ObjectDetectorConfig):
 
 
 class YOLOSegDetectorConfig(ObjectDetectorConfig):
-    yolo_model_path: str = "data/models/yolov8n-seg.pt"
+    yolo_model_path: Path = Path("/app/data/models/yolov8n-seg.pt")
     yolo_conf_thresh: float = 0.0005
     iou_threshold: float = 0.2
 
@@ -136,10 +137,10 @@ class FullConfig(BaseModel):
     detector_type: Literal["selective_search", "yolo_seg"] = "selective_search"
     detector_opts: DetectorConfig
     tracker_manager_opts: TrackerManagerConfig
-    input_video_path: str
-    ref_frame_path: str | None
-    output_json_path: str
-    output_video_path: str
+    input_video_path: Path
+    ref_frame_path: Path | None
+    output_json_path: Path
+    output_video_path: Path
     log_level: Literal["CRITICAL", "DEBUG", "ERROR", "INFO", "WARNING"] = "INFO"
     start: int = 0
     step: int = 5
@@ -147,14 +148,15 @@ class FullConfig(BaseModel):
 
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> "FullConfig":
-        input_video_path: str = f"/app/data/inputs/{args.input_video_name}"
-        ref_frame_path: str | None = (
-            f"/app/data/inputs/{args.first_frame}" if args.first_frame else None
-        )
-        output_video_path: str = f"/app/data/outputs/{args.output_video_name}"
-        output_json_path: str = f"/app/data/outputs/{args.output_json_name}"
+        output_dir = Path("/app/data/outputs")
+        input_dir = Path("/app/data/inputs")
 
-        video_opts: VideoParams = VideoParams.from_video(input_video_path)
+        input_video_path: Path = input_dir / args.input_video_name
+        ref_frame_path: Path | None = (
+            input_dir / args.first_frame if args.first_frame else None
+        )
+        output_video_path: Path = output_dir / args.output_video_name
+        output_json_path: Path = output_dir / args.output_json_name
 
         if args.detector_type == "selective_search":
             from fish_tracker.utils.configs import SelectiveSearchDetectorConfig
@@ -164,9 +166,10 @@ class FullConfig(BaseModel):
             from fish_tracker.utils.configs import YOLOSegDetectorConfig
 
             detector_opts = YOLOSegDetectorConfig(**vars(args))
-        video_params: VideoParams = VideoParams.from_video(input_video_path)
+
+        video_opts: VideoParams = VideoParams.from_video(input_video_path)
         tracker_manager_opts: TrackerManagerConfig = TrackerManagerConfig(
-            **vars(args), **vars(video_params)
+            **vars(args), **vars(video_opts)
         )
 
         return cls(
@@ -184,10 +187,11 @@ class FullConfig(BaseModel):
             end=args.end if args.end > args.start else video_opts.nb_frames,
         )
 
-    def save_yaml(self, path: str) -> None:
+    def save_yaml(self) -> None:
         import yaml
 
-        with open(path, "w") as f:
+        yml_path: Path = Path("/app/data/outputs/config.yaml")
+        with open(yml_path, "w") as f:
             yaml.dump(self.model_dump(), f, sort_keys=False)
 
     model_config = ConfigDict(extra="ignore")

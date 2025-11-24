@@ -3,6 +3,7 @@
 Entrypoint: run_roi_detection using a pool of workers. Uses init_worker pattern.
 """
 import multiprocessing as mp
+from pathlib import Path
 
 from .worker import init_worker, worker_process_chunk
 from fish_tracker.utils.configs import (
@@ -16,14 +17,12 @@ from fish_tracker.utils.roi_processor import ROIResult
 def run_roi_detection(config: FullConfig) -> dict[int, list[ROIResult]]:
     dump_dir = None
     if config.detector_opts.dump_masked_frames:
-        import os
-
-        dump_dir = "/app/data/outputs/masked_frames"
-        os.makedirs(dump_dir, exist_ok=True)
+        dump_dir = Path("/app/data/outputs/masked_frames")
+        dump_dir.mkdir(parents=True, exist_ok=True)
 
     start, step, end = config.start, config.step, config.end
     chunk_size = config.detector_opts.chunk_size
-    chunks: list[tuple[str, int, int, int, str | None, str | None]] = []
+    chunks: list[tuple[Path, int, int, int, Path | None, Path | None]] = []
     for chunk_start in range(start, end, step * chunk_size):
         chunk_end = min(chunk_start + step * chunk_size, end)
         chunks.append(
@@ -36,9 +35,7 @@ def run_roi_detection(config: FullConfig) -> dict[int, list[ROIResult]]:
                 dump_dir,
             )
         )
-
     all_detections: dict[int, list[ROIResult]] = {}
-
     if config.detector_type == "selective_search":
         detector_opts = config.detector_opts
         assert isinstance(detector_opts, SelectiveSearchDetectorConfig)

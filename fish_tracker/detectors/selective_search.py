@@ -4,6 +4,7 @@ Selective Search detector implementation.
 """
 import cv2
 
+from pathlib import Path
 from typing import Sequence
 
 from .base import ObjectDetector
@@ -45,12 +46,12 @@ class SelectiveSearchDetector(ObjectDetector[SelectiveSearchDetectorConfig]):
 
     def process_chunk(
         self,
-        video_path: str,
+        video_path: Path,
         start: int,
         end: int,
         step: int,
-        ref_frame_path: str | None,
-        dump_dir: str | None,
+        ref_frame_path: Path | None,
+        dump_dir: Path | None,
     ) -> dict[int, list[ROIResult]]:
         from .worker import frames_generator
 

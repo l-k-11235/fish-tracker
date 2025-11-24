@@ -1,4 +1,5 @@
 # detectors/yolo_seg.py
+from pathlib import Path
 
 from .base import ObjectDetector
 from fish_tracker.utils.configs import YOLOSegDetectorConfig
@@ -48,12 +49,12 @@ class YOLOSegDetector(ObjectDetector[YOLOSegDetectorConfig]):
 
     def process_chunk(
         self,
-        video_path: str,
+        video_path: Path,
         start: int,
         end: int,
         step: int,
-        ref_frame_path: str | None,
-        dump_dir: str | None,
+        ref_frame_path: Path | None,
+        dump_dir: Path | None,
     ) -> dict[int, list[ROIResult]]:
         from .worker import frames_generator
 
