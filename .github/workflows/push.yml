@@ -42,19 +42,19 @@ jobs:
           docker build -t fish-tracker-test -f docker/Dockerfile .
 
       # Run some minimal inferences to test the pipeline
-      - name: Test 1: selective search
+      - name: Test 1 - selective search
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/data/examples:/app/data \
             fish-tracker-test \
             --config /app/data/configs/test1_selective_search.yaml
-      - name: Test 2: selective search + hybrid matching + reference frame
+      - name: Test 2 - selective search + hybrid matching + reference frame
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/data/examples:/app/data \
             fish-tracker-test \
             --config /app/data/configs/test2_selective_search.yaml
-      - name: Test 3: yolo8n-seg
+      - name: Test 3 - yolo8n-seg
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/data/examples:/app/data \
