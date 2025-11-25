@@ -53,12 +53,14 @@ jobs:
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/data/examples:/app/data \
+            -v ${{ github.workspace }}/data/configs:/app/configs \
             fish-tracker-test \
             --config /app/configs/test2_selective_search.yaml
       - name: Test 3 - yolo8n-seg
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/data/examples:/app/data \
+            -v ${{ github.workspace }}/data/configs:/app/configs \
             fish-tracker-test \
             --config /app/configs/test3_yolo_seg.yaml
 

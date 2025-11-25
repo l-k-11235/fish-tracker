@@ -1,0 +1,5 @@
+input_video_path: /app/data/WellsDam_1_East_20170627_13_210-240.mp4
+ref_frame_path: /app/data/WellsDam_1_East_20170627_13_first_frame.png
+end: 20
+tracker_manager_opts:
+  method: hybrid
