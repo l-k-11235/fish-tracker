@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from fish_tracker.utils.configs import TrackerConfig
+from fish_tracker.config import TrackerConfig
 from fish_tracker.trackers.base import BaseTracker
 
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Generator, Tuple, Optional, Dict, List, Union
 
 from fish_tracker.utils.roi_processor import ROIResult
-from fish_tracker.utils.configs import (
+from fish_tracker.config import (
     SelectiveSearchDetectorConfig,
     YOLOSegDetectorConfig,
 )

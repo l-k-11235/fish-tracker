@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 from PIL import Image
 from typing import Any, Callable, Literal, Optional
 
-from fish_tracker.utils.configs import ROIProcessorConfig
+from fish_tracker.config import ROIProcessorConfig
 from fish_tracker.utils.logger import get_logger
 
 

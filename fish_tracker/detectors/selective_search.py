@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .base import ObjectDetector
-from fish_tracker.utils.configs import SelectiveSearchDetectorConfig
+from fish_tracker.config import SelectiveSearchDetectorConfig
 from fish_tracker.utils.roi_processor import ROIResult
 
 

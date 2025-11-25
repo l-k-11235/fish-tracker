@@ -5,7 +5,7 @@ from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 from typing import TypedDict
 
-from fish_tracker.utils.configs import TrackerMatcherConfig
+from fish_tracker.config import TrackerMatcherConfig
 from fish_tracker.utils.logger import get_logger
 from fish_tracker.utils.roi_processor import ROIResult
 from fish_tracker.trackers.base import BaseTracker
@@ -22,8 +22,8 @@ class TrackerMatcher:
         self.logger = get_logger("TrackerMatcher")
         self.logger.info(f"TrackerMatcher Initialization with method {config.method}")
 
-        self.frame_height: int = config.frame_height
-        self.frame_width: int = config.frame_width
+        self.frame_height: int = config.video_opts.frame_height
+        self.frame_width: int = config.video_opts.frame_width
         self.method: str = config.method
         self.alpha: float = config.alpha
         if config.distance_threshold is None:
@@ -56,10 +56,12 @@ class TrackerMatcher:
             return geo_cost
 
         # EMBEDDING COST
-        track_embeds = np.stack([t.embedding.detach().cpu().numpy() for t in trackers])
-        det_embeds = np.stack([d.embedding.detach().cpu().numpy() for d in detections])
+        track_embeds: list[list[float]] = [t.embedding for t in trackers]
+        track_embeds_np = np.asarray(track_embeds)
+        det_embeds: list[list[float]] = [d.embedding for d in detections]
+        det_embeds_np = np.asarray(det_embeds)
 
-        embed_cost = cdist(track_embeds, det_embeds, metric="cosine")
+        embed_cost = cdist(track_embeds_np, det_embeds_np, metric="cosine")
 
         if method == "embedding":
             return embed_cost

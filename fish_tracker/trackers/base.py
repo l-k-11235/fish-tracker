@@ -5,7 +5,7 @@ import time
 
 from abc import ABC, abstractmethod
 
-from fish_tracker.utils.configs import TrackerConfig
+from fish_tracker.config import TrackerConfig
 
 
 class BaseTracker(ABC):

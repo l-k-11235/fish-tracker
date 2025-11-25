@@ -1,10 +1,11 @@
 import json
 import numpy as np
 
+from pathlib import Path
 from torch import Tensor
 
 from fish_tracker.core.tracker_matcher import Match, TrackerMatcher
-from fish_tracker.utils.configs import TrackerConfig, TrackerManagerConfig
+from fish_tracker.config import TrackerConfig, TrackerManagerConfig
 from fish_tracker.utils.logger import get_logger
 from fish_tracker.utils.roi_processor import ROIResult
 from fish_tracker.trackers.base import BaseTracker
@@ -17,12 +18,7 @@ class TrackerManager(TrackerMatcher):
         self.logger = get_logger("TrackerManager")
         self.logger.info("TrackerManager Initialization")
         self.max_absences: int = config.max_absences
-        self.min_tracking_duration = config.min_tracking_duration
-        self.fps: float = config.fps
-        self.input_dir = "/app/data/input"
-        self.output_dir = "/app/data/outputs"
-        self.input_video_path: str = f"/app/data/inputs/{config.input_video_name}"
-        self.output_json_path: str = f"/app/data/outputs/{config.output_json_name}"
+        self.min_tracking_duration: float = config.min_tracking_duration
         self.motion_boxes: list[tuple[int, int, int, int]] = []
         self.embeddings: list[Tensor] = []
         self.trackers: list[BaseTracker] = []
@@ -124,7 +120,10 @@ class TrackerManager(TrackerMatcher):
                 self.trashed.append(_tracker)
 
     def save_results(
-        self, motion_boxes: dict[int, list[tuple[int, int, int, int]]], time: float
+        self,
+        output_json_path: Path,
+        motion_boxes: dict[int, list[tuple[int, int, int, int]]],
+        time: float,
     ) -> None:
         """
         Saves tracking results (valid and rejected trackers).
@@ -167,5 +166,5 @@ class TrackerManager(TrackerMatcher):
         else:
             result_data["Trash"] = []
 
-        with open(self.output_json_path, "w", encoding="utf-8") as f:
+        with open(output_json_path, "w", encoding="utf-8") as f:
             json.dump(result_data, f, indent=2, default=to_serializable)

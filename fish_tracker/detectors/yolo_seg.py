@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from .base import ObjectDetector
-from fish_tracker.utils.configs import YOLOSegDetectorConfig
+from fish_tracker.config import YOLOSegDetectorConfig
 from fish_tracker.utils.roi_processor import ROIResult
 
 
@@ -67,11 +67,11 @@ class YOLOSegDetector(ObjectDetector[YOLOSegDetectorConfig]):
         for frame_num, frame, ref_frame in frames_generator(
             video_path, start, end, step, ref_frame_path
         ):
-            batch_frames.append(frame)
             mask_motion, diff_image_rgb = self.background_subtractor.apply(
                 frame, ref_frame
             )
             batch_mask = mask_motion
+            batch_frames.append(frame)
             batch_diff.append(diff_image_rgb)
             batch_masks_motion.append(batch_mask)
             batch_frame_nums.append(frame_num)
@@ -79,12 +79,22 @@ class YOLOSegDetector(ObjectDetector[YOLOSegDetectorConfig]):
         # do a batch predict on the diffs
         batch_results = self.yolo_model.predict(
             source=batch_diff,
-            batch=len(batch_frames),
+            batch=len(batch_diff),
             conf=self.config.yolo_conf_thresh,
             device="cpu",
             half=False,
             verbose=False,
         )
+        lengths = {
+            "batch_results": len(batch_results),
+            "batch_frames": len(batch_frames),
+            "batch_frame_nums": len(batch_frame_nums),
+            "batch_masks_motion": len(batch_masks_motion),
+            "batch_diff": len(batch_diff),
+        }
+
+        if len(set(lengths.values())) != 1:
+            raise ValueError(f"Batch size mismatch: {lengths}")
 
         for frame, frame_num, frame_results, mask_motion, diff in zip(
             batch_frames,
@@ -99,5 +109,4 @@ class YOLOSegDetector(ObjectDetector[YOLOSegDetectorConfig]):
             detections[frame_num] = self.process(frame)
             if dump_dir is not None:
                 self.dump_processed_frame(dump_dir, frame_num)
-
         return detections

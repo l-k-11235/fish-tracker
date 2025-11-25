@@ -6,7 +6,7 @@ from logging import Logger
 import numpy as np
 from numpy.typing import NDArray
 from fish_tracker.utils.logger import get_logger
-from fish_tracker.utils.configs import ObjectDetectorConfig
+from fish_tracker.config import ObjectDetectorConfig
 from fish_tracker.utils.roi_processor import ROIProcessor, ROIResult
 from fish_tracker.utils.background import BackgroundSubtractor
 

@@ -6,7 +6,7 @@ import multiprocessing as mp
 from pathlib import Path
 
 from .worker import init_worker, worker_process_chunk
-from fish_tracker.utils.configs import (
+from fish_tracker.config import (
     FullConfig,
     SelectiveSearchDetectorConfig,
     YOLOSegDetectorConfig,
