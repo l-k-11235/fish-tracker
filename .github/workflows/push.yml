@@ -46,6 +46,7 @@ jobs:
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/data/examples:/app/data \
+            -v ${{ github.workspace }}/data/configs:/app/data/configs \
             fish-tracker-test \
             --config /app/data/configs/test1_selective_search.yaml
       - name: Test 2 - selective search + hybrid matching + reference frame
