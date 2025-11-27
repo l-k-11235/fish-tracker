@@ -15,11 +15,9 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 
 ```
 .
-├── docker
-│   ├── build.sh
-│   ├── Dockerfile
 ├── fish_tracker
 │   ├── __init__.py
+│   ├── main.py
 │   ├── config
 |   |   ├── full_config.py
 |   |   ├── __init__.py
@@ -32,7 +30,6 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 |   |   │   └── yolo_seg.py
 │   ├── core
 │   │   ├── __init__.py
-│   │   ├── main.py
 │   │   ├── tracker_manager.py
 │   │   └── tracker_matcher.py
 │   │   └── output_writer.py
@@ -52,6 +49,12 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 │       ├── background.py
 │       ├── roi_processor.py
 │       ├── logger.py
+├── docker
+│   ├── build.sh
+│   ├── Dockerfile
+│   ├── .dockerignore
+├── .github/workflows
+│   ├── push.yaml
 ├── data
 │   ├── examples
 │   │   ├── inputs
@@ -66,6 +69,10 @@ Example runs are provided using data from the EyeSea project (e.g., video DCPUD_
 │   │       └── output.mp4
 │   ├── models
 │   │   └── yolov8n-seg.pt
+│   ├── configs
+│   │   ├── test1_selective_search.yaml
+│   │   ├── test2_selective_search.yaml
+│   │   └── test3_yolo_seg.yaml
 ├── Readme.md
 ├── setup.py
 └── requirements.txt
