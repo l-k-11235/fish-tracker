@@ -29,12 +29,12 @@ jobs:
       # Run Black
       - name: Run Black
         run: |
-          black --check fish_tracker/
+          black --check src/fish_tracker/
 
       # Run Flake8
       - name: Run Flake8
         run: |
-          flake8 fish_tracker/
+          flake8 src/fish_tracker/
 
       # Build Docker image
       - name: Build Docker image
