@@ -11,16 +11,17 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-RUN pip install --no-cache-dir ultralytics
-RUN pip uninstall -y opencv-python
-RUN pip install --no-cache-dir git+https://github.com/openai/CLIP.git
-RUN pip install --no-cache-dir d
+RUN pip install torch==2.9.0 \
+    torchvision==0.24.0 \
+    torchaudio==2.9.0 \
+    --index-url https://download.pytorch.org/whl/cu130
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install ultralytics==8.3.229 && \
+    pip uninstall -y opencv-python && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
 RUN pip install -e /app
 
-ENTRYPOINT ["python", "-m", "fish_tracker.core.main"]
+ENTRYPOINT ["python", "-m", "fish_tracker.main"]
