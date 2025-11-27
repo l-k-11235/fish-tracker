@@ -41,25 +41,26 @@ jobs:
         run: |
           docker build -t fish-tracker-test -f docker/Dockerfile .
 
-      # Run a minimal inference to test the pipeline
-      - name: Run minimal tracking example using selective search for detection
+      # Run some minimal inferences to test the pipeline
+      - name: Test 1 - selective search
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/data/examples:/app/data \
+            -v ${{ github.workspace }}/data/configs:/app/configs \
             fish-tracker-test \
-            --input_video_name WellsDam_1_East_20170627_13_210-240.mp4 \
-            --first_frame WellsDam_1_East_20170627_13_first_frame.png \
-            --output_video_name output_test.mp4 \
-            --output_json_name output_test.json \
-            --end 3
-      - name: Run minimal tracking example using yolo8n_seg for detection
+            --config /app/configs/test1_selective_search.yaml
+      - name: Test 2 - selective search + hybrid matching + reference frame
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/data/examples:/app/data \
+            -v ${{ github.workspace }}/data/configs:/app/configs \
             fish-tracker-test \
-            --input_video_name WellsDam_1_East_20170627_13_210-240.mp4 \
-            --first_frame WellsDam_1_East_20170627_13_first_frame.png \
-            --output_video_name output_test.mp4 \
-            --output_json_name output_test.json \
-            --detector_type yolo_seg \
-            --end 3
+            --config /app/configs/test2_selective_search.yaml
+      - name: Test 3 - yolo8n-seg
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/data/examples:/app/data \
+            -v ${{ github.workspace }}/data/configs:/app/configs \
+            fish-tracker-test \
+            --config /app/configs/test3_yolo_seg.yaml
+

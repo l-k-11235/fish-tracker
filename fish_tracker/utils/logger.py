@@ -1,23 +1,25 @@
 import logging
 import os
 
+from pathlib import Path
+
+
 _global_log_level = logging.INFO
 _log_file_path = None
 
 
-def resolve_log_level(level):
-    """Convertit un niveau en str ou int vers un niveau logging."""
+def resolve_log_level(level: int | str) -> int:
     if isinstance(level, str):
         return logging._nameToLevel.get(level.upper(), logging.INFO)
     return level
 
 
-def set_global_log_level(level):
+def set_global_log_level(level: int | str) -> None:
     global _global_log_level
     _global_log_level = resolve_log_level(level)
 
 
-def set_log_file(path: str):
+def set_log_file(path: Path) -> None:
     global _log_file_path
     _log_file_path = path
 

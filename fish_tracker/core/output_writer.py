@@ -5,8 +5,18 @@ import numpy as np
 import os
 import subprocess
 
+from numpy.typing import NDArray
+from pathlib import Path
+from typing import Any
 
-def write_trajectories(frame, frame_num, motion_boxes, trackers, output_dir):
+
+def write_trajectories(
+    frame: NDArray[Any],
+    frame_num: int,
+    motion_boxes: list[tuple[int, int, int, int]],
+    trackers,
+    output_dir,
+):
 
     for x, y, w, h in motion_boxes:
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -83,7 +93,9 @@ def save_output_frames(
         pool.starmap(write_trajectories_chunk, chunks)
 
 
-def concat_frames_to_video(folder, output_video_path, logger, fps=30):
+def concat_frames_to_video(
+    folder: Path, output_video_path: Path, fps: int = 30
+) -> None:
 
     cmd = [
         "ffmpeg",
@@ -93,15 +105,11 @@ def concat_frames_to_video(folder, output_video_path, logger, fps=30):
         "-pattern_type",
         "glob",
         "-i",
-        os.path.join(folder, "out_frame*.png"),
+        Path(folder) / "out_frame*.png",
         "-c:v",
         "libx264",
         "-pix_fmt",
         "yuv420p",
         output_video_path,
     ]
-    logger.debug(" ".join(cmd))
-
     subprocess.run(cmd)
-
-    logger.info(f"Created video : {os.path.join(folder, output_video_path)}")
