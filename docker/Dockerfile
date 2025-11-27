@@ -9,19 +9,16 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-COPY requirements.txt .
-
 RUN pip install torch==2.9.0 \
     torchvision==0.24.0 \
     torchaudio==2.9.0 \
     --index-url https://download.pytorch.org/whl/cu130
 
 RUN pip install ultralytics==8.3.229 && \
-    pip uninstall -y opencv-python && \
-    pip install --no-cache-dir -r requirements.txt
+    pip uninstall -y opencv-python
 
 COPY . .
 
-RUN pip install -e /app
+RUN pip install --no-cache-dir .
 
 ENTRYPOINT ["python", "-m", "fish_tracker.main"]
