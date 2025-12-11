@@ -6,8 +6,6 @@ It combines **motion-based ROI detection**, **neural detection (YOLO)**, and **o
 
 The pipeline is implemented in Python using OpenCV and PyTorch, and is designed to be easily extended with new detectors, matchers, or trackers.
 
-The code is written in Python with OpenCV and is designed to be easily extended with other tracking strategies.
-
 Example runs are provided using data from the EyeSea project (e.g., video DCPUD_Wellsdam).
 
 
