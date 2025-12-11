@@ -32,3 +32,7 @@ Source = "https://github.com/l-k-11235/fish-tracker"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
